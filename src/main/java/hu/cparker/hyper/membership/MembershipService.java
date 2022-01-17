@@ -2,32 +2,36 @@ package hu.cparker.hyper.membership;
 
 import hu.cparker.hyper.membership.dto.CreateMembershipCommand;
 import hu.cparker.hyper.membership.dto.MembershipDto;
-import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Type;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
+import java.util.*;
 
 @Service
-@AllArgsConstructor
 public class MembershipService {
 
     private MembershipRepository repo;
 
     private ModelMapper modelMapper;
 
-//    private DailyRewardService dailyRewardService;
-
     private Map<LocalDate, Double> dailyRewards;
 
     private List<Membership> memberships;
 
-    private double dailyRewardStack;
+    private Double dailyRewardStack;
+
+    public MembershipService(MembershipRepository repo, ModelMapper modelMapper, Map<LocalDate, Double> dailyRewards, List<Membership> memberships) {
+        this.repo = repo;
+        this.modelMapper = modelMapper;
+        this.dailyRewards = new TreeMap<>();
+        this.memberships = new ArrayList<>();
+        this.dailyRewardStack = 0.0;
+    }
+
+//    private DailyRewardService dailyRewardService;
 
     public List<MembershipDto> listMemberships() {
         List<Membership> memberships = repo.findAll();
@@ -43,36 +47,54 @@ public class MembershipService {
         return modelMapper.map(savedMembership, MembershipDto.class);
     }
 
-    public Double getDailyReward(LocalDate date) {
-        List<MembershipDto> membershipDtos = listMemberships();
-        checkDate(date, membershipDtos);
-//        Map<LocalDate, Double> dailyRewards = dailyRewardService.getDailyRewards();
-//        double dailyRewardStack = dailyRewardService.getDailyRewardStack();
+    public Map.Entry<LocalDate, Double> getMaxDailyReward() {
+        initDailyRewards();
 
-        ListIterator<MembershipDto> membershipIt = membershipDtos.listIterator();
-        while (membershipIt.hasNext()) {
-            MembershipDto membership = membershipIt.next();
-            if (date.isBefore(membership.getDateOfPurchase())) break;
-            for (int i = 1; i <= membership.getDuration(); i++) {
-                fillDailyRewards(membership, i, dailyRewards);
-                dailyRewardStack += dailyRewards.get(membership.getDateOfPurchase());
-                if (dailyRewardStack >= 50) {
-                    Membership newMembership = new Membership("Rebuy", membership.getDateOfPurchase().plusDays(i), 50);
-                    membershipIt.add(modelMapper.map(newMembership, MembershipDto.class));
-                    dailyRewardStack -= 50;
-                }
-            }
-
-        }
-
-        return dailyRewards.get(date);
+        return dailyRewards.entrySet().stream().max(Map.Entry.comparingByValue()).orElseThrow(IllegalStateException::new);
     }
 
-    private void fillDailyRewards(MembershipDto membership, int i, Map<LocalDate, Double> dailyRewards) {
-        if (dailyRewards.containsKey(membership.getDateOfPurchase().plusDays(i))) {
-            dailyRewards.put(membership.getDateOfPurchase().plusDays(i), dailyRewards.get(membership.getDateOfPurchase().plusDays(i)) + membership.getDailyReward());
-        } else {
-            dailyRewards.put(membership.getDateOfPurchase().plusDays(i), membership.getDailyReward());
+    public List<DailyReward> getDailyRewardChangesPerDay() {
+        initDailyRewards();
+        List<DailyReward> changedDailyRewards = new ArrayList<>();
+        DailyReward prevDailyReward = null;
+
+        for (Map.Entry<LocalDate, Double> reward : dailyRewards.entrySet()) {
+            DailyReward dailyReward = new DailyReward(reward.getKey(), reward.getValue());
+            if (prevDailyReward == null || !dailyReward.getReward().equals(prevDailyReward.getReward())) {
+                changedDailyRewards.add(dailyReward);
+            }
+            prevDailyReward = dailyReward;
+        }
+
+        return changedDailyRewards;
+    }
+
+    private void initDailyRewards() {
+        init();
+        fillMemberships();
+        memberships.forEach(this::fillDailyRewards);
+    }
+
+    private void init() {
+        memberships.clear();
+        dailyRewards.clear();
+    }
+
+    private void fillMemberships() {
+        List<MembershipDto> membershipDtos = listMemberships();
+        Type target = new TypeToken<List<Membership>>(){}.getType();
+        memberships = modelMapper.map(membershipDtos, target);
+    }
+
+
+    private void fillDailyRewards(Membership membership) {
+        for (int i = 1; i <= membership.getDuration(); i++) {
+            LocalDate actualDate = membership.getDateOfPurchase().plusDays(i);
+            if (dailyRewards.containsKey(actualDate)) {
+                dailyRewards.put(actualDate, dailyRewards.get(actualDate) + membership.getDailyReward());
+            } else {
+                dailyRewards.put(actualDate, membership.getDailyReward());
+            }
         }
     }
 

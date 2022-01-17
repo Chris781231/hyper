@@ -1,6 +1,5 @@
 package hu.cparker.hyper;
 
-import hu.cparker.hyper.membership.DailyRewardService;
 import org.modelmapper.ModelMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -19,10 +18,4 @@ public class HyperApplication {
 	public ModelMapper getModelMapper() {
 		return new ModelMapper();
 	}
-
-	@Bean
-	public DailyRewardService dailyRewardService() {
-		return new DailyRewardService();
-	}
-
 }

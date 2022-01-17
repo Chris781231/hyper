@@ -4,12 +4,12 @@ import hu.cparker.hyper.membership.dto.CreateMembershipCommand;
 import hu.cparker.hyper.membership.dto.MembershipDto;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.AllArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/")
@@ -30,9 +30,13 @@ public class MembershipController {
         return service.listMemberships();
     }
 
-    @GetMapping("/{date}")
-    public double getDailyReward(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-//        LocalDate localDate = LocalDate.of(2021, 1, 1);
-        return service.getDailyReward(date);
+    @GetMapping("/max")
+    public Map.Entry<LocalDate, Double> getMaxDailyReward() {
+        return service.getMaxDailyReward();
+    }
+
+    @GetMapping("/daily_reward_changes_per_day")
+    public List<DailyReward> getDailyRewardChangesPerDay() {
+        return service.getDailyRewardChangesPerDay();
     }
 }
